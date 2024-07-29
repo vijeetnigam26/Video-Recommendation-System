@@ -1,0 +1,6 @@
+torch
+torchvision
+requests
+Pillow
+numpy
+pytube
