@@ -1,84 +1,67 @@
 import streamlit as st
-from src.data_collection import fetch_video_data, download_video, capture_frame_from_video
-from src.feature_extraction import FeatureExtractor
-import os
+import requests
+import pandas as pd
+from io import BytesIO
+from pytube import YouTube
+from PIL import Image
 
-def fetch_and_process_video(api_key, query):
-    """
-    Fetches video data, captures a frame, and extracts features.
-    
-    Parameters:
-        api_key (str): YouTube API key.
-        query (str): Search query.
-        
-    Returns:
-        list: List of recommended video metadata.
-    """
-    video_data = fetch_video_data(api_key, query)
-    
-    # Debugging: Print the API response
-    st.write("API Response:")
-    st.write(video_data)
-    
-    if 'items' not in video_data:
-        st.error("No items found in the API response.")
-        return []
-    
-    recommendations = []
-    
-    for item in video_data['items']:
+# Define a function to fetch and process YouTube videos based on the search keyword
+def fetch_and_process_video(api_key, search_keyword):
+    # YouTube API endpoint
+    youtube_api_url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={search_keyword}&key={api_key}&type=video&maxResults=5"
+
+    # Send request to YouTube API
+    response = requests.get(youtube_api_url)
+    data = response.json()
+
+    # Check if the response contains items
+    if 'items' not in data:
+        st.error("Error: No items found in the API response.")
+        return None
+
+    videos = []
+
+    for item in data['items']:
         video_id = item['id']['videoId']
-        video_url = f"https://www.youtube.com/watch?v={video_id}"
         title = item['snippet']['title']
         thumbnail_url = item['snippet']['thumbnails']['high']['url']
-        
-        try:
-            video_file = download_video(video_url)
-            frame = capture_frame_from_video(video_file, timestamp_sec=10)  # Capture frame at 10 seconds
-            os.remove(video_file)  # Clean up video file after extraction
-        except ValueError as e:
-            print(f"Error: {e}")
-            continue
-        
-        # Extract features (optional for further processing)
-        extractor = FeatureExtractor()
-        features = extractor.extract_features(frame)
-        
-        recommendations.append({
-            'title': title,
-            'url': video_url,
-            'thumbnail': thumbnail_url
-        })
-    
-    return recommendations
+        video_url = f"https://www.youtube.com/watch?v={video_id}"
 
+        # Download the video thumbnail
+        try:
+            thumbnail_response = requests.get(thumbnail_url)
+            thumbnail_image = Image.open(BytesIO(thumbnail_response.content))
+            video_file = {
+                'title': title,
+                'video_url': video_url,
+                'thumbnail': thumbnail_image
+            }
+            videos.append(video_file)
+        except Exception as e:
+            st.error(f"Error processing video thumbnail: {e}")
+
+    return videos
+
+# Streamlit app
 def main():
     st.title("YouTube Video Recommendation System")
-    
-    # Print available secrets for debugging
-    st.write("Available secrets:")
-    st.write(st.secrets)
-    
-    # Fetch API key from secrets
-    try:
-        api_key = st.secrets["youtube_api_key"]["youtube_api_key"]
-        st.write(f"API Key: {api_key}")
-    except KeyError as e:
-        st.error(f"KeyError: {str(e)}")
-    
-    # Input for search query
-    query = st.text_input("Enter search keyword:")
-    
-    if query:
-        recommendations = fetch_and_process_video(api_key, query)
-        
-        if recommendations:
-            st.write("Recommended Videos:")
-            for video in recommendations:
-                st.image(video['thumbnail'], width=200)
-                st.write(f"[{video['title']}]({video['url']})")
+
+    # Input field for search keyword
+    api_key = st.secrets["youtube"]["api_key"]
+    search_keyword = st.text_input("Enter search keyword:", "")
+
+    if st.button("Search"):
+        if search_keyword:
+            with st.spinner("Fetching video recommendations..."):
+                videos = fetch_and_process_video(api_key, search_keyword)
+                
+                if videos:
+                    for video in videos:
+                        st.subheader(video['title'])
+                        st.image(video['thumbnail'], use_column_width=True)
+                        st.write(f"[Watch Video]({video['video_url']})")
         else:
-            st.write("No recommendations found.")
+            st.error("Please enter a search keyword.")
 
 if __name__ == "__main__":
     main()

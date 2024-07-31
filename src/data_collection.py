@@ -29,42 +29,25 @@ def fetch_video_data(api_key, query):
     return response.json()
 
 def download_video(video_url):
-    """
-    Downloads the video from YouTube.
-    
-    Parameters:
-        video_url (str): URL of the YouTube video.
-        
-    Returns:
-        str: File path of the downloaded video.
-    """
-    yt = YouTube(video_url)
-    stream = yt.streams.filter(file_extension='mp4').first()
-    video_file = 'downloaded_video.mp4'
-    stream.download(filename=video_file)
-    return video_file
+    try:
+        yt = YouTube(video_url)
+        stream = yt.streams.get_highest_resolution()
+        # Save the video
+        video_file = stream.download(filename='video.mp4')
+        return video_file
+    except requests.exceptions.RequestException as e:
+        raise ValueError(f"Error downloading video: {e}")
+    except Exception as e:
+        raise ValueError(f"Unexpected error: {e}")
 
 def capture_frame_from_video(video_file, timestamp_sec):
-    """
-    Captures a frame from a video at a specific timestamp.
-    
-    Parameters:
-        video_file (str): File path of the video.
-        timestamp_sec (int): Timestamp in seconds to capture the frame.
-        
-    Returns:
-        np.ndarray: Captured frame as an image.
-    """
-    video_capture = cv2.VideoCapture(video_file)
-    fps = video_capture.get(cv2.CAP_PROP_FPS)
-    frame_number = int(fps * timestamp_sec)
-    
-    # Set frame position
-    video_capture.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
-    success, frame = video_capture.read()
-    video_capture.release()
-    
-    if success:
+    try:
+        cap = cv2.VideoCapture(video_file)
+        cap.set(cv2.CAP_PROP_POS_MSEC, timestamp_sec * 1000)
+        success, frame = cap.read()
+        cap.release()
+        if not success:
+            raise ValueError("Failed to capture frame")
         return frame
-    else:
-        raise ValueError(f"Unable to capture frame at timestamp {timestamp_sec} seconds.")
+    except Exception as e:
+        raise ValueError(f"Error capturing frame: {e}")

@@ -1,9 +1,9 @@
 import numpy as np
-from data_collection import fetch_video_data, fetch_user_interactions, save_frame_to_file, capture_frame_from_video
-from feature_extraction import FeatureExtractor
-from recommendation import recommend_videos, collaborative_filtering
-from get_api import get_youtube_api_key
-from user_behavior import user_behavior_analysis
+from src.data_collection import fetch_video_data, fetch_user_interactions, save_frame_to_file, capture_frame_from_video
+from src.feature_extraction import FeatureExtractor
+from src.recommendation import recommend_videos, collaborative_filtering
+from src.get_api import get_youtube_api_key
+from src.user_behavior import user_behavior_analysis
 
 def extract_video_id_from_url(url):
     """
